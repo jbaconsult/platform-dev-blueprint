@@ -9,10 +9,11 @@ Persists a session's results and prepares the next. The authoritative order is
 `docs/WORKING_CONCEPT.md` §3.3; the WORKLIST schema is §11; git discipline is
 §12. This skill is the executable form.
 
-Parametric over `PROJECT.md`: `qs_tool`, `fs_connector`, `workspace_root`,
-`adr_path`. Read the write discipline in `docs/TOOLING.md` before editing —
-closure is where the connector's quirks bite (no parent auto-create, read-back
-needed, large full-file writes risk failure → sectional edits).
+Parametric over `PROJECT.md`: `status_tool`, `fs_connector`, `workspace_root`,
+`adr_path`, `increment_branch`, `memory_scope`. Read the write discipline in
+`docs/TOOLING.md` before editing — closure is where the connector's quirks bite
+(no parent auto-create, read-back needed, large full-file writes risk failure →
+sectional edits).
 
 ## Closure sequence (in order)
 
@@ -40,14 +41,14 @@ sections in order:
 
 ### 4. STARTER.md — rewritten, boot-only
 Rewrite `chat-context/STARTER.md` as a minimal boot pointer (~1–2 KB): header +
-mandatory reads + QS check + next front + the first decision the next session
-faces. Task briefing does NOT belong here — it lives in WORKLIST `## Pointer` /
-the sprint file. A small file like STARTER is more reliably written whole than
-chained edits.
+mandatory reads + status check + next front + the first decision the next
+session faces. Task briefing does NOT belong here — it lives in WORKLIST
+`## Pointer` / the sprint file. A small file like STARTER is more reliably
+written whole than chained edits.
 
-### 5. QS before the git block
-Run `<qs_tool>` again. **Build the git block only from this verified state** —
-never from STARTER prose or memory.
+### 5. Status check before the git block
+Call the `<status_tool>` (default `gitstatus`) again. **Build the git block only
+from this verified state** — never from STARTER prose or memory.
 
 ### 6. Git block — operator-gated (WORKING_CONCEPT §12)
 Claude proposes, the operator executes. One copy-paste bash block. First line is
@@ -60,7 +61,7 @@ git branch --show-current
 git add chat-context/ docs/   # only what changed
 git status -sb
 git commit -m "Sprint NN closure: <summary>"
-git push origin <increment-branch>
+git push origin <increment_branch>
 ```
 
 **Two-stage** (a submodule such as `spec/` was written — usual for ADR work):
@@ -79,10 +80,10 @@ git push origin --delete feature/<name> 2>/dev/null || true
 cd <workspace_root>
 git add chat-context/ docs/ spec
 git commit -m "Sprint NN closure: <summary>; spec pointer bump"
-git push origin <increment-branch>
+git push origin <increment_branch>
 ```
 `main` of the superrepo is reserved for milestone completion. Offer a post-push
-`<qs_tool>` for a clean-state confirmation.
+`<status_tool>` call for a clean-state confirmation.
 
 ### 7. Starter prompt — the final act
 The **last** thing emitted is the copy-paste starter prompt for the next

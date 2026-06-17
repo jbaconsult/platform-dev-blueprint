@@ -1,0 +1,67 @@
+# buildhealth.sh.example — TEMPLATE, not an active tool.
+#
+# Rename to `buildhealth.sh` and adapt to your stack to activate it. The `.example`
+# suffix keeps the script-runner server from picking it up (it scans *.sh with an
+# @mcp-tool header; this file is *.sh.example, so it is ignored).
+#
+# Purpose: a build-health check is a status tool — it answers "does the project
+# still build / pass?" and reports the outcome. It belongs in scripts/ like any
+# other tool. It is instance-specific because it knows the tech stack, so the
+# blueprint ships this template rather than a concrete build.
+#
+# Discipline for a good build-health tool:
+#   - Report, don't mutate: run the build/verify, capture pass/fail, but do not
+#     publish artifacts or change committed state.
+#   - On failure, surface the first N error lines — enough to diagnose, not the
+#     whole log. The caller can re-run verbose if needed.
+#   - Run from the superrepo root (the server sets cwd there). Use absolute or
+#     repo-relative module paths.
+#   - Tolerate unknown arguments (the server forwards all args to every tool).
+#
+# Below is a worked example for a Maven multi-module project. Replace the build
+# command and parsing for your stack (npm/tsc, gradle, cargo, go, …).
+
+#!/usr/bin/env bash
+#
+# @mcp-tool: buildhealth
+# @mcp-desc: Build-health check — runs the project build/verify and reports pass/fail with the first error lines on failure.
+# @mcp-arg: verbose | boolean | optional | print the full build log instead of just the first error lines
+# @mcp-arg: module | string | optional | restrict the build to a single module/package
+#
+# Exit: 0 if the build passed; non-zero (the build's own exit code) on failure.
+
+set -u
+
+VERBOSE=0
+MODULE=""
+for arg in "$@"; do
+  case "$arg" in
+    verbose|--verbose) VERBOSE=1 ;;
+    module=*)          MODULE="${arg#module=}" ;;
+    *) : ;;
+  esac
+done
+
+# --- EXAMPLE: Maven multi-module. Replace for your stack. ---
+# build_cmd=(mvn -q -B verify)
+# [ -n "$MODULE" ] && build_cmd=(mvn -q -B -pl "$MODULE" -am verify)
+#
+# log="$(mktemp)"
+# if "${build_cmd[@]}" >"$log" 2>&1; then
+#   echo "buildhealth: PASS"
+#   rc=0
+# else
+#   rc=$?
+#   echo "buildhealth: FAIL (exit $rc)"
+#   if [ "$VERBOSE" -eq 1 ]; then
+#     cat "$log"
+#   else
+#     echo "--- first error lines ---"
+#     grep -nE 'ERROR|BUILD FAILURE|error:' "$log" | head -n 20
+#   fi
+# fi
+# rm -f "$log"
+# exit "$rc"
+
+echo "buildhealth.sh.example is a template — copy to buildhealth.sh and adapt to your stack." >&2
+exit 0
