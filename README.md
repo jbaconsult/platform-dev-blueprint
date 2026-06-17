@@ -55,7 +55,8 @@ platform-dev/
 │   ├── WORKLIST.md          ## Pointer / ## Aktiv / ## Archiv
 │   ├── STARTER.md           boot pointer
 │   ├── sprints/             durable sprint records
-│   └── findings/            reported findings
+│   ├── findings/            reported findings
+│   └── handover/            Code-return reports, staged for curation
 └── spec/               git submodule — your product's specification + ADRs
 ```
 
@@ -81,7 +82,7 @@ their values from `PROJECT.md` and never hard-code a scope, tool, or path.
 | `session-start` | boot | Load memory + constraints, load deferred FS tools, confirm root, run the status tool, read steering docs, boot summary. |
 | `solve-problem` | work | The decision method: one decision per turn, recommendation-first, the five-criteria matrix, empirical discipline, findings vs. decisions. |
 | `session-closure` | closure | Findings → sprint file → WORKLIST (with archiving) → STARTER → operator-gated git block → next starter prompt. |
-| `code-handover` | work | Build a self-contained dispatch to hand an implementation sub-sprint to the code apparatus. |
+| `code-handover` | work | Build a self-contained dispatch to hand an implementation sub-sprint to the code apparatus; every dispatch returns a handover report. |
 | `adr-author` | work | Persist a ratified decision document-first: ADR doc before the memory pointer, supersession handled both ways. |
 | `fs-write` | any | The write discipline for the filesystem connector — load deferred tools, create dirs non-recursively, read back after every write. |
 

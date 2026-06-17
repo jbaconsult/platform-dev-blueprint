@@ -7,9 +7,11 @@ description: Build a self-contained dispatch prompt to hand an implementation su
 
 Desktop is the orchestrator and overview-holder; Claude Code runs autonomous
 sub-sprints. The handover is a single **self-contained copy-paste prompt** — not
-a file, not a STARTER. Code returns only a **pointer** (sprint-doc path +
-one-line result). Authoritative description: `docs/WORKING_CONCEPT.md` §2
-(apparatus boundary) and §14 (dispatch).
+a file, not a STARTER. Every dispatch ends with Code writing a **report to
+`chat-context/handover/`** and returning a **one-line pointer** to it — the
+pointer is the signal, the handover file is the substance. There are no
+unregulated Code dispatches. Authoritative description: `docs/WORKING_CONCEPT.md`
+§2 (apparatus boundary) and §14 (dispatch).
 
 ## Apparatus boundary — when to dispatch (WORKING_CONCEPT §2)
 Dispatch when the work touches program code:
@@ -34,6 +36,8 @@ a Code sub-sprint, dispatched from here.
 - **Fail-loud-over-hallucinate** — if a gate rejects *correctly* (genuine gap),
   fail loud and return; do not build a workaround. Only a confirmed hygiene bug
   is fixed autonomously.
+- **Closure is a handover report** — the sub-sprint is not done until its report
+  is written to `chat-context/handover/` (see Closure below).
 - Notation latin/alphanumeric (Stufe 0/1/2, Variant 1/2). No Greek letters.
 
 ## Dispatch template
@@ -81,19 +85,32 @@ Stage 1: …
 ## Gate (→ next stage / closure)
 <explicit, checkable MET criteria; on a correctly-rejecting gate → fail-loud return>
 
-## Closure
-Sprint-doc `sprints/sprint-NN.X-<slug>.md` + pointer return. NO STARTER (Desktop
-holds it). Write findings. Git operator-gated.
+## Closure (MANDATORY — every dispatch)
+1. Write a structured report to
+   `chat-context/handover/handover-<YYYY-MM-DD>-<slug>.md`:
+   - result (gate met / failed-loud + why), what was built/measured, evidence
+     pointers, what was deferred, and any NEW finding or decision that needs
+     Concept ratification.
+2. Sprint-doc `sprints/sprint-NN.X-<slug>.md` as usual.
+3. Return a ONE-LINE pointer to the handover file ("done, report:
+   chat-context/handover/handover-…md"). The pointer is the signal; the report
+   is the substance — never return substance only in chat.
+4. NO STARTER (Desktop holds it). Git operator-gated.
 ```
 
 ## After Code returns (WORKING_CONCEPT §14.3)
-Code returns a sprint-doc pointer + one-line result. Back on Desktop:
-1. **Post-run control check** — read the returned evidence; do not take "gate
-   met" at face value if a confounder is plausible (e.g. the measured path was
-   never actually exercised). Report confounders honestly.
-2. Reconcile the wall table / promotions (e.g. candidate→real at n≥2).
-3. Fold the result into the next decision (`solve-problem`) and the closure
-   (`session-closure`).
+Code returns a one-line pointer to its `chat-context/handover/` report. Back on
+Desktop:
+1. **Read the handover report**, not just the chat pointer.
+2. **Post-run control check** — do not take "gate met" at face value if a
+   confounder is plausible (e.g. the measured path was never actually
+   exercised). Report confounders honestly.
+3. Reconcile the wall table / promotions (e.g. candidate→real at n≥2).
+4. Fold the result into the next decision (`solve-problem`).
+5. **At closure, curate** the handover report into the durable record — the
+   sprint file, a finding, or a decision note — and then **prune the consumed
+   report** from `handover/` (it is a staging area, not the record). See
+   `session-closure` and WORKING_CONCEPT §3.3.
 
 ## Git for the code apparatus
 All git stays operator-gated (WORKING_CONCEPT §12): commit + push feature +

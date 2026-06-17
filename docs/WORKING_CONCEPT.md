@@ -87,7 +87,8 @@ platform-dev/                 central repository, published as blueprint
 │   ├── WORKLIST.md           ## Pointer / ## Aktiv / ## Archiv (see §11)
 │   ├── STARTER.md            boot pointer (~1–2 KB)
 │   ├── sprints/              sprint-NN-<slug>.md  (durable sprint records)
-│   └── findings/             <slug>.md, sec-*.md
+│   ├── findings/             <slug>.md, sec-*.md
+│   └── handover/             Code-return reports, staged for curation (§14)
 └── spec/                     git submodule — product-specific
     └── docs/
         ├── adr/              ADRs (see §9)
@@ -172,7 +173,11 @@ git block → emit the next session's starter prompt as the final act. Nothing
 follows the starter prompt.
 
 Sub-decisions that crossed the apparatus boundary are dispatched to Code
-(`code-handover`, §14) during the work phase, not at closure.
+(`code-handover`, §14) during the work phase, not at closure. Where a Code
+sub-sprint has returned, closure also **curates its handover report** from
+`chat-context/handover/` into the durable record (the sprint file, a finding, or
+a decision note) and **prunes the consumed report** — `handover/` is a staging
+area, not the record (§14.3).
 
 ---
 
@@ -479,7 +484,8 @@ block, the operator executes it. Claude does not push, merge, or commit.
 When ratified design work must become program code (§2), it is handed to the
 Code apparatus as a **self-contained copy-paste dispatch** — not a file, not a
 STARTER. The Code session has none of the Desktop session's context, so the
-dispatch must stand entirely on its own.
+dispatch must stand entirely on its own. **Every dispatch is regulated**: it ends
+with a handover report (§14.3). There are no unregulated Code dispatches.
 
 ### §14.1 Dispatch principles
 - **Fully autonomous to closure** — every gate is written into the dispatch; no
@@ -498,15 +504,30 @@ dispatch must stand entirely on its own.
 Apparatus & autonomy · guiding philosophy (the doctrines it must carry) ·
 single-variable boundary · mandatory reads (with anchors) · QS & branch ·
 build steps (per stage) · verification (n, what is measured, evidence
-convention) · gate (explicit, checkable MET criteria) · closure.
+convention) · gate (explicit, checkable MET criteria) · closure (the mandatory
+handover report, §14.3).
 
 ### §14.3 Return and reconciliation
-Code returns **only a pointer** — the sprint-document path plus a one-line
-result. No STARTER (the Desktop session holds it). Back on Desktop, run a
-post-run control check: read the returned evidence, and do not take "gate met"
-at face value if a confounder is plausible (for example, if the measured path
-was never actually exercised). Report confounders honestly; fold the result into
-the next decision and the closure.
+Every Code sub-sprint closes by writing a **structured report** to
+`chat-context/handover/handover-<YYYY-MM-DD>-<slug>.md` — the result (gate met or
+failed-loud and why), what was built/measured, evidence pointers, what was
+deferred, and any new finding or decision that needs Concept ratification. Code
+then returns a **one-line pointer** to that report (plus the sprint-document
+path). The pointer is the **signal**; the report is the **substance** — Code
+never returns substance only in chat. No STARTER (the Desktop session holds it).
+
+Back on Desktop:
+1. **Read the handover report**, not just the chat pointer.
+2. **Post-run control check** — do not take "gate met" at face value if a
+   confounder is plausible (for example, if the measured path was never actually
+   exercised). Report confounders honestly.
+3. Fold the result into the next decision (`solve-problem`).
+4. **At closure, curate** the report into the durable record (the sprint file, a
+   finding, or a decision note) and **prune the consumed report** from
+   `handover/`. The folder is a staging area, not the record (§3.3).
+
+The Code apparatus cannot write mnemonics or ledgers; anything newly decided in a
+sub-sprint returns in the handover report and is ratified by Concept (§8).
 
 ---
 
@@ -528,6 +549,8 @@ the next decision and the closure.
 - **ratify** — to confirm a decision/convention/design/rule (reserved word, §8).
 - **QS** — the quick-status tool (`qs_tool`) that reports authoritative git
   state; the only trusted source for workspace state.
+- **handover report** — the mandatory file a Code sub-sprint writes to
+  `chat-context/handover/` at closure; staged for Desktop to curate, §14.3.
 - **§17 dispatch** — the self-contained handover from Desktop to Code, §14.
 - **spec** — the product-specific specification submodule (`spec/`), home of
   ADRs and product doctrines.
