@@ -1,0 +1,34 @@
+# .gitignore — platform-dev-blueprint
+#
+# Deliberately minimal. This is a steering/documentation workspace, not a build
+# project — there is no compiled output to ignore. Keep chat-context/ tracked:
+# WORKLIST, STARTER, sprints/, and findings/ are the living state and travel
+# with the repo. Do NOT add chat-context/ here.
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# --- QS runtime output ---
+# The QS tool prints its report to the session; any on-disk status dump it may
+# write is generated state, not source. Adjust these patterns when the QS tool
+# in scripts/ is finalized.
+qs-last.*
+*.qs-out
+scripts/**/__pycache__/
+
+# --- Local secrets / env (instance-side, never in the blueprint) ---
+# PROJECT.md is secret-free by design (paths + slugs only). These guard against
+# an instance dropping local credentials into the workspace.
+.env
+.env.*
+*.local
+secrets.*
+
+# --- Keep empty tracked dirs ---
+# .gitkeep files are intentional — never ignore them.
+!.gitkeep
