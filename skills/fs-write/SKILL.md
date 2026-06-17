@@ -34,20 +34,29 @@ tool_search(query="<fs_connector> write file modify create directory move copy")
 So the reliable pattern for a new nested file is: create each directory level
 top-down, then `write_file`.
 
-## Editing existing files
-- For small files (STARTER, PROJECT), a whole-file `write_file` is reliable.
-- For large files (WORKLIST, big docs), prefer **sectional edits** over a full
-  rewrite — a wholesale rewrite of a large file is the higher-risk path. Keep
-  each edit small and anchored on a structurally distinctive, byte-exact string.
-- If an edit tool reports zero changes, treat it as a silent no-op (the anchor
-  did not match — often the file changed under you). Read the file fresh and
-  retry with a shorter unique anchor; never assume the edit landed.
+## Editing existing files — whole-file only
+The connector exposes **`write_file` (whole-file write), not a sectional
+find/replace edit.** Every change to an existing file is a full overwrite:
+**read the current content fresh, modify it in full, write it back.** There is
+no anchored in-place edit — do not assume a `modify_file`/`str_replace` exists
+on this connector (a host may offer a generic `str_replace`/`view` pair, but
+those act on a separate container filesystem, not the connector's work area, and
+will not edit these files).
+
+Consequences for the working style:
+- **Always read the file immediately before overwriting it**, so no concurrent
+  change is lost — the overwrite is only as current as your last read.
+- **Keep large files (WORKLIST, big docs) well-structured** so a whole-file
+  rewrite stays manageable and low-risk. A very large rewrite is the
+  higher-risk write; if a file grows unwieldy, that is a signal to split it.
+- For new files and small files (STARTER, PROJECT) the whole-file write is
+  straightforward.
 
 ## Read-back is mandatory
 A success message is not proof the write landed where you think. After any
 `write_file` to a new path, confirm via `list_directory` (targeted) and, if in
-doubt, re-read the file. After an edit, verify the changed region. This is the
-single most important habit — see `docs/TOOLING.md`.
+doubt, re-read the file. After overwriting an existing file, re-read the changed
+region. This is the single most important habit — see `docs/TOOLING.md`.
 
 ## Large-file reads
 If a read returns a "result too large" sentinel, fall back to a targeted read
@@ -58,7 +67,8 @@ index instead.
 ## Operational notes
 - Keep one session active against the connector at a time; parallel sessions
   sharing one server can contend.
-- The connector may lack a delete tool — the operator removes files manually.
+- The connector may lack a delete tool — the operator removes files manually
+  (e.g. a `git rm` in the closure block).
 - Record any new quirk you hit as a finding and fold it into `docs/TOOLING.md`;
   the connector is part of the apparatus and its behaviour is dogfooding
   evidence.
