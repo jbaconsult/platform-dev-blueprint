@@ -44,11 +44,13 @@ read it first.
 platform-dev/
 ├── PROJECT.md          instance config — the parameters you fill in
 ├── README.md           this file
+├── .claude-plugin/     plugin manifest (plugin.json) — packages skills/ for Desktop
 ├── skills/             the six skills that encode the lifecycle
 ├── scripts/            the workspace toolbox — scripts the AI can run for you
 ├── docs/               stable reference
 │   ├── WORKING_CONCEPT.md   the method (authoritative)
-│   └── TOOLING.md           how the tools actually behave
+│   ├── TOOLING.md           how the tools actually behave
+│   └── PLUGIN-INSTALL.md    how to install the skills as a Desktop plugin
 ├── chat-context/       living per-session state
 │   ├── WORKLIST.md          ## Pointer / ## Aktiv / ## Archiv
 │   ├── STARTER.md           boot pointer
@@ -76,7 +78,7 @@ their values from `PROJECT.md` and never hard-code a scope, tool, or path.
 
 | Skill | Phase | What it does |
 |---|---|---|
-| `session-start` | boot | Load memory + constraints, load deferred FS tools, confirm root, run QS, read steering docs, boot summary. |
+| `session-start` | boot | Load memory + constraints, load deferred FS tools, confirm root, run the status tool, read steering docs, boot summary. |
 | `solve-problem` | work | The decision method: one decision per turn, recommendation-first, the five-criteria matrix, empirical discipline, findings vs. decisions. |
 | `session-closure` | closure | Findings → sprint file → WORKLIST (with archiving) → STARTER → operator-gated git block → next starter prompt. |
 | `code-handover` | work | Build a self-contained dispatch to hand an implementation sub-sprint to the code apparatus. |
@@ -88,6 +90,12 @@ A typical day runs `session-start` → `solve-problem` (repeatedly, with
 `code-handover` → `session-closure`. You don't steer the order; it follows what
 you're doing.
 
+The skills are packaged as a **Claude plugin** (`.claude-plugin/plugin.json` +
+`skills/`). To make them trigger in a Claude Desktop session, build the plugin
+ZIP and upload it via Customize → Skills — see
+[`docs/PLUGIN-INSTALL.md`](docs/PLUGIN-INSTALL.md). (Claude Desktop uses a plugin
+ZIP, not the `~/.claude/skills/` directory that Claude Code reads.)
+
 ---
 
 ## Tooling
@@ -95,8 +103,8 @@ you're doing.
 - **Filesystem:** the mark3labs
   [`mcp-filesystem-server`](https://github.com/mark3labs/mcp-filesystem-server),
   one connector spanning the work area. Its quirks (no parent auto-creation,
-  non-recursive `create_directory`, read-back discipline) are documented in
-  [`docs/TOOLING.md`](docs/TOOLING.md).
+  non-recursive `create_directory`, whole-file writes only, read-back
+  discipline) are documented in [`docs/TOOLING.md`](docs/TOOLING.md).
 - **Memory:** [Kumbuka](https://kumbuka.ai) — the durable, scoped work-memory.
   Each instance has its own `memory_scope`. Loaded at boot, written
   document-first for decisions, propose-before-write always.
@@ -104,7 +112,8 @@ you're doing.
   server exposes each script with an `@mcp-tool` header as its own tool, run from
   the superrepo root — so the AI can call them during a session. Status checks
   (QS — git ground-truth via `gitstatus`, build-health, …) are one kind; any
-  repeatable command belongs here. See [`scripts/README.md`](scripts/README.md).
+  repeatable command belongs here. See [`scripts/README.md`](scripts/README.md)
+  and [`scripts/mcp-server/DESIGN.md`](scripts/mcp-server/DESIGN.md).
 
 ---
 
@@ -112,9 +121,9 @@ you're doing.
 
 1. **Copy the blueprint** into your workspace (or use it as a GitHub template).
 2. **Fill in `PROJECT.md`** — replace the `example-project` placeholders with
-   your `project_name`, `memory_scope`, `fs_connector`, `qs_tool`,
-   `workspace_root`, and `adr_path`. Mirror these into your project's runtime
-   instructions so a session has them from the first message.
+   your `project_name`, `memory_scope`, `fs_connector`, `script_runner_server`,
+   `status_tool`, `workspace_root`, and `adr_path`. Mirror these into your
+   project's runtime instructions so a session has them from the first message.
 3. **Mount your repositories** as submodules — `spec/` for the specification
    (ADRs under `spec/docs/adr/`), plus your source and infra repos. See the
    submodule section below. If you have no separate spec repo yet, point
@@ -122,7 +131,10 @@ you're doing.
 4. **Set up the tools** — the filesystem connector (point its root at your work
    area), the script-runner server (`scripts/mcp-server/`), and (recommended) a
    Kumbuka scope.
-5. **Start working** — open a session; `session-start` boots it. Your first
+5. **Install the skills plugin** — give your plugin a unique `name` in
+   `.claude-plugin/plugin.json` (e.g. `<project>-platform-dev`), build the ZIP,
+   and upload it in Claude Desktop (`docs/PLUGIN-INSTALL.md`).
+6. **Start working** — open a session; `session-start` boots it. Your first
    closure writes the real `## Pointer`, and you're rolling.
 
 The blueprint stays neutral and publishable; only `PROJECT.md` and `spec/` carry

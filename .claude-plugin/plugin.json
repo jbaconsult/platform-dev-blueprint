@@ -1,0 +1,8 @@
+{
+  "name": "platform-dev",
+  "version": "0.1.0",
+  "description": "The platform-dev lifecycle skills: session boot, the decision method, closure, code handover, ADR authoring, and filesystem write discipline. Encodes the working method in docs/WORKING_CONCEPT.md.",
+  "author": {
+    "name": "jbaconsult"
+  }
+}
