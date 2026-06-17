@@ -45,7 +45,7 @@ platform-dev/
 ├── PROJECT.md          instance config — the parameters you fill in
 ├── README.md           this file
 ├── skills/             the six skills that encode the lifecycle
-├── scripts/            the QS status tooling
+├── scripts/            the workspace toolbox — scripts the AI can run for you
 ├── docs/               stable reference
 │   ├── WORKING_CONCEPT.md   the method (authoritative)
 │   └── TOOLING.md           how the tools actually behave
@@ -100,8 +100,11 @@ you're doing.
 - **Memory:** [Kumbuka](https://kumbuka.ai) — the durable, scoped work-memory.
   Each instance has its own `memory_scope`. Loaded at boot, written
   document-first for decisions, propose-before-write always.
-- **QS:** a status tool that reports authoritative git state — the only trusted
-  source for workspace state. Lives in `scripts/`.
+- **Scripts (`scripts/`):** the workspace toolbox. The **script-runner** MCP
+  server exposes each script with an `@mcp-tool` header as its own tool, run from
+  the superrepo root — so the AI can call them during a session. Status checks
+  (QS — git ground-truth via `gitstatus`, build-health, …) are one kind; any
+  repeatable command belongs here. See [`scripts/README.md`](scripts/README.md).
 
 ---
 
@@ -112,16 +115,81 @@ you're doing.
    your `project_name`, `memory_scope`, `fs_connector`, `qs_tool`,
    `workspace_root`, and `adr_path`. Mirror these into your project's runtime
    instructions so a session has them from the first message.
-3. **Mount your specification repo** as the `spec/` submodule (recommended). Put
-   ADRs under `spec/docs/adr/`. If you have no separate spec repo, point
+3. **Mount your repositories** as submodules — `spec/` for the specification
+   (ADRs under `spec/docs/adr/`), plus your source and infra repos. See the
+   submodule section below. If you have no separate spec repo yet, point
    `adr_path` at a local directory and use single-stage closures.
 4. **Set up the tools** — the filesystem connector (point its root at your work
-   area), the QS script, and (recommended) a Kumbuka scope.
+   area), the script-runner server (`scripts/mcp-server/`), and (recommended) a
+   Kumbuka scope.
 5. **Start working** — open a session; `session-start` boots it. Your first
    closure writes the real `## Pointer`, and you're rolling.
 
 The blueprint stays neutral and publishable; only `PROJECT.md` and `spec/` carry
 anything project-specific.
+
+---
+
+## Submodules — platform-dev as the bracket around your work
+
+`platform-dev` is the **steering layer**, not a monorepo. Your actual
+development — source code, specification, infrastructure — lives in its own
+repositories, and `platform-dev` pulls them in as **git submodules** so that one
+workspace becomes the single bracket around the whole effort. This is the
+recommended topology, and it is what makes the tooling (`gitstatus`) and the
+two-stage git discipline (`WORKING_CONCEPT.md` §12) meaningful.
+
+The idea: from the `platform-dev` root you — and the AI — see and steer every
+part of the project at once. A single `gitstatus` call reports the superrepo and
+every submodule: which branch each is on, what is uncommitted, whether each
+pointer is aligned. A closure that touches a submodule completes that submodule's
+feature branch fully before bumping its pointer in the superrepo, so the recorded
+state is always coherent.
+
+### Recommended layout
+
+```
+platform-dev/                 the steering bracket (this repo)
+├── spec/                     submodule — specification + ADRs (docs/adr/)
+├── <product-api>/            submodule — a service / app source repo
+├── <product-web>/            submodule — another source repo
+├── <infra>/                  submodule — infrastructure-as-code
+└── …                         as many as the project needs
+```
+
+`spec/` is the one submodule the blueprint assumes by convention (it is where
+`adr-author` writes ADRs). The rest are yours to add as the project grows.
+
+### Adding submodules
+
+```bash
+cd <workspace_root>
+git submodule add <git-url> spec
+git submodule add <git-url> <product-api>
+git commit -m "add submodules: spec, <product-api>"
+```
+
+After cloning a platform-dev instance elsewhere, hydrate the submodules:
+
+```bash
+git clone <platform-dev-url>
+cd <repo>
+git submodule update --init --recursive
+```
+
+### Working across submodules
+
+- **Status:** `gitstatus` reports the superrepo and all submodules in one call —
+  the boot and pre-closure ground-truth check.
+- **Branches:** each submodule has its own branches; a feature spans the
+  submodule(s) it touches plus the superrepo pointer.
+- **Closure:** two-stage when a submodule changed — finish the submodule's
+  feature branch (merge `--no-ff`, push, delete) *before* bumping its pointer in
+  the superrepo and committing `chat-context/` (`WORKING_CONCEPT.md` §12).
+
+If a project genuinely has no separate repositories yet, start without submodules
+and add them as the work splits out — the structure does not force the bracket,
+it enables it.
 
 ---
 

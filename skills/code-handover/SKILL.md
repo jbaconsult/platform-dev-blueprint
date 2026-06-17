@@ -65,9 +65,10 @@ code). <file from commit ZZZ> stays untouched.
 - <WORKING_CONCEPT anchors: §6 empirical discipline, §14 dispatch>
 - <code anchors: locate, don't guess — run-driver, smoke suite, projector stack>
 
-## QS & branch
-1. QS via <qs_tool> for ground truth.
-2. Anchor = <main SHA, QS-clean>. Branch off this anchor.
+## Status & branch
+1. Get ground truth via the status tool (e.g. gitstatus) or plain git in the
+   work tree.
+2. Anchor = <main SHA, clean>. Branch off this anchor.
 3. Idempotent: git switch -c feature/<name> 2>/dev/null || git switch feature/<name>
 
 ## Build (per stage)
@@ -96,5 +97,6 @@ Code returns a sprint-doc pointer + one-line result. Back on Desktop:
 
 ## Git for the code apparatus
 All git stays operator-gated (WORKING_CONCEPT §12): commit + push feature +
-merge `--no-ff` to main + push + branch delete. Pre-commit: verify branch via
-`<qs_tool>`, not from prose.
+merge `--no-ff` to main + push + branch delete. Pre-commit: verify the branch
+via the status tool (e.g. gitstatus) or `git branch --show-current`, not from
+prose.

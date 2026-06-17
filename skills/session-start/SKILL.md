@@ -14,9 +14,10 @@ This skill is **parametric**. It reads the instance's values from `PROJECT.md`
 at the repo root (and they are mirrored in the project's runtime instructions):
 
 - `memory_scope` — the memory scope slug to load
-- `qs_tool` — the QS tool-script name to call
 - `fs_connector` — the filesystem MCP connector name (typically
   `filesystem-work`)
+- `status_tool` — the script-runner status tool to call for git ground-truth
+  (default `gitstatus`), provided by `script_runner_server`
 - `workspace_root` — the absolute path of the workspace
 - `adr_path` — default `spec/docs/adr/`
 
@@ -61,10 +62,12 @@ Call `<fs_connector>:list_allowed_directories` and confirm `<workspace_root>` is
 reachable. Absolute paths are required for every file operation — relative
 paths fail.
 
-### 4. Run QS — ground truth
-Call the `<qs_tool>` tool-script (no parameters). It returns the authoritative
-git state: branch, recent commits, submodule HEADs, pointer alignment (`+`
-prefix = mismatch), working-tree state.
+### 4. Status — ground truth
+Call the `<status_tool>` tool (default `gitstatus`) provided by the
+`script_runner_server`. It returns the authoritative git state: branch, upstream
+ahead/behind, short working-tree status, latest commit, and submodule pointer
+alignment (`+` prefix = mismatch). The script-runner runs it from the superrepo
+root, so it covers the superrepo and every submodule in one call.
 
 This is the **only** trusted source for workspace state (WORKING_CONCEPT §12).
 Read it; do not infer state from the STARTER prose or from memory. Flag any
@@ -83,7 +86,7 @@ those too in the same batched call.
 
 ### 6. Boot summary
 Emit one short paragraph: memory loaded + constraints in force · root confirmed ·
-QS fresh & state (clean / named anomaly) · reads absorbed (one clause each).
+status fresh & state (clean / named anomaly) · reads absorbed (one clause each).
 Then proceed to the **first decision** — which the STARTER usually pre-stages —
 under the `solve-problem` discipline (one decision per turn,
 recommendation-first).
@@ -91,5 +94,6 @@ recommendation-first).
 ## What NOT to do at boot
 - Don't produce an overwhelming first turn (full harvest + several decisions at
   once). One thing per turn from the start (WORKING_CONCEPT §4).
-- Don't write anything before QS confirms a clean/understood state.
-- Don't trust the STARTER's prose about branch or commit — verify via QS.
+- Don't write anything before the status tool confirms a clean/understood state.
+- Don't trust the STARTER's prose about branch or commit — verify via the status
+  tool.

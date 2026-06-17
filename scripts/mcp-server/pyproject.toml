@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "script-runner"
+version = "0.1.0"
+description = "MCP server exposing each @mcp-tool script in scripts/ as its own tool, run from the superrepo root."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["mcp>=1.2"]
+
+[project.scripts]
+script-runner = "script_runner.__main__:run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["script_runner"]
