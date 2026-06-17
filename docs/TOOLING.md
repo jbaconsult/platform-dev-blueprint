@@ -42,46 +42,55 @@ The `session-start` skill does this at boot so closure does not stall.
 Reliable pattern for a new nested file: create each directory level top-down,
 then `write_file`.
 
+### No sectional-edit tool
+The `filesystem-work` connector exposes `write_file` (whole-file write), not a
+sectional find/replace edit. Every change to an existing file is a full
+overwrite: read the current content, modify it in full, write it back — there is
+no anchored in-place edit. Keep large files (e.g. WORKLIST) structured so a
+whole-file rewrite stays manageable, and always read the file fresh before
+overwriting so no concurrent change is lost. (This differs from earlier
+connectors that had a `modify_file`; do not assume one exists. Note: the host
+may also offer a generic `str_replace`/`view` pair, but those act on a separate
+container filesystem, not on the connector's work area — they will not edit
+these files.)
+
 ### Read-back discipline
 A success message is **not** proof the write landed where intended. After any
 `write_file` to a new path, confirm with a targeted `list_directory`; when in
 doubt, re-read the file. This is the single most important habit — it catches
 silent path mistakes before they compound.
 
-### Editing files
-- Small files (STARTER, PROJECT): a whole-file `write_file` is reliable.
-- Large files (WORKLIST, large docs): prefer sectional edits over a full
-  rewrite; a wholesale rewrite of a large file is the higher-risk path. Anchor
-  edits on a structurally distinctive, byte-exact string.
-- A "zero changes" / no-op edit means the anchor did not match (often the file
-  changed under you). Read fresh, retry with a shorter unique anchor; never
-  assume it landed.
-
 ### Other notes
 - Run one session against the connector at a time; parallel sessions sharing one
   server can contend.
-- The connector may have no delete tool — the operator removes files manually.
+- The connector may have no delete tool — the operator removes files manually
+  (e.g. a `git rm` in the closure block).
 - Very large directory listings can be slow or unwieldy — use targeted
   `read_multiple_files` from a known index rather than listing a huge folder.
 
 ---
 
-## QS tool
+## Status tooling — the script-runner server
 
-The QS tool (the `qs_tool` parameter, e.g. `run-qs-dev`) reports authoritative
-git state: branch, recent commits, submodule HEADs, pointer alignment (a `+`
-prefix marks a pointer/HEAD mismatch), and working-tree status. It is the **only
-trusted source for workspace state** (`WORKING_CONCEPT.md` §12) — never infer
-state from prose or memory.
+Status checks are MCP tools provided by the **script-runner** server
+(`scripts/mcp-server/`, the `script_runner_server` parameter in `PROJECT.md`).
+Each `@mcp-tool` script in `scripts/` is exposed as its own tool, run from the
+superrepo root. There is no single umbrella "QS tool" — status checks are
+individual tools called by name.
 
-Call it at session boot (`session-start`) and again immediately before
-generating any git block (`session-closure`). After the operator runs a git
-block, a follow-up QS call confirms the clean end state.
+The lifecycle's git ground-truth comes from the `status_tool` (default
+`gitstatus`): branch, upstream ahead/behind, short working-tree status, latest
+commit, and submodule pointer alignment (a `+` prefix marks a pointer/HEAD
+mismatch). Because the script-runner runs it from the superrepo root, one call
+covers the superrepo and every submodule. It is the **only trusted source for
+workspace state** (`WORKING_CONCEPT.md` §12) — never infer state from prose or
+memory.
 
-The QS tool is a thin wrapper that runs a status script in `scripts/` and
-returns its output. Its consolidation (one wrapper, modular sub-scripts) is a
-separate design track — see `scripts/` and the project's own notes when that is
-built.
+Call the status tool at session boot (`session-start`) and again immediately
+before generating any git block (`session-closure`). After the operator runs a
+git block, a follow-up call confirms the clean end state. See
+`scripts/mcp-server/DESIGN.md` for the server and `scripts/README.md` for the
+`@mcp-tool` script convention.
 
 ---
 
