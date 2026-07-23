@@ -1,23 +1,45 @@
-Rufe zu Beginn memory_load_context(scope="example-project") auf und befolge jede
-type=constraint-Regel. Notation ausschließlich alphanumerisch (A1/A2,
-Variant 1/2/3, Option A/B/C), niemals griechische Buchstaben. Inhaltliches
-gehört nach Git, nicht ins Memory.
+---
+title: "example-project Sprint #1 — <front>"
+sprint: 1
+apparatus: concept
+date: <YYYY-MM-DD>
+template_version: 6
+---
 
-# STARTER — example-project · Sprint NN · <front>
+# {{title}}
 
-> Boot pointer only (~1–2 KB). Task briefing lives in WORKLIST `## Pointer` and
-> the sprint files — not here. Boot sequence: docs/WORKING_CONCEPT.md §3.1
-> (executable form: the `session-start` skill).
+> **Blueprint-Platzhalter.** Die erste echte Closure ersetzt diese Datei durch eine aus
+> `chat-context/templates/TEMPLATE-starter.md` erzeugte Instanz (dort stehen auch die
+> maßgeblichen Regeln: (fix)-Sektionen wörtlich übernehmen, keine Historie im STARTER,
+> Drei-Load-Boot). Beim Aufsetzen einer Instanz: Template kopieren, `<memory_scope>`,
+> `<fs_connector>`, `<workspace_root>`, `<status_tool>` aus `PROJECT.md` einsetzen,
+> die (variable)-Sektionen für die erste Session füllen.
 
-**Apparatus:** Desktop / concept. **Branch:** main.
+## Boot (fix — maßgebliche, geordnete Sequenz; nicht editieren)
 
-## Mandatory reads
-- chat-context/WORKLIST.md (`## Pointer` = next front; `## Aktiv`)
-- _(any sprint file or finding the next session needs)_
+Top-down ausführen. **Der Boot lädt genau DREI Dinge: den Memory-Digest, diese STARTER-Datei und
+den Status-Tool-Ground-Truth.** Alles andere ist Pull-when-needed, nie Boot-Pflicht.
 
-## QS check
-Run the QS tool (`run-qs-dev`) at boot for ground-truth git state. Run it again
-before any git block.
+1. `memory_load_context(scope: "<memory_scope>")` — Digest für die ganze Session halten; jede
+   `type=constraint`-Regel befolgen.
+2. Die deferred `<fs_connector>`-Write-Tools laden (`tool_search`); Workspace-Root
+   `<workspace_root>` bestätigen.
+3. `<status_tool>` für Ground-Truth; gegen **Erwartung & Anomalien** abgleichen (Match → wortlos
+   weiter; Abweichung → nur die prüfen).
+4. Diese Datei zu Ende lesen (`## Aktiv-Queue`, `## Arbeitsauftrag`), dann den Arbeitsauftrag
+   abarbeiten.
 
-## First decision
-_(set by the previous session's closure — what the next session decides first)_
+## Erwartung & Anomalien (variable)
+
+- **Erwartet:** _(erste Session: frisch abgeleitetes Repo, main, clean)_
+
+## Aktiv-Queue (variable)
+
+| # | Cluster | Titel | Komp | Typ | Prio | Größe | Disp | Status | Ref |
+|---|---------|-------|------|-----|------|-------|------|--------|-----|
+_(bei Closure aus dem Backlog befüllt — leer heißt: nächste Session zieht sich die erste Aufgabe selbst)_
+
+## Arbeitsauftrag (variable)
+
+- **Erste Aufgabe im Detail:** _(von der ableitenden Instanz gesetzt — z. B. „PROJECT.md-Parameter
+  füllen und die erste Sprint-Front festlegen")_

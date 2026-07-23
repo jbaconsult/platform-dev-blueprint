@@ -1,99 +1,102 @@
 ---
 name: session-start
-description: Boot a platform-dev working session in the correct, deterministic order. Use this skill at the START of any session — triggers include "boot", "Session-Boot", "starte die Session", "Sprint N starten", "lade die Tools", pasting a STARTER prompt, or any first message that references the workspace, a branch, a sprint number, or the chat-context steering docs. Use it even when the user just says "weiter wo wir waren" at the top of a fresh chat.
+description: Boot a platform-dev working session in the correct, deterministic order. Use this skill at the START of any session — triggers include "boot", "Session-Boot", "starte die Session", "Sprint N starten", "lade die Tools", pasting a STARTER prompt, or any first message that references the workspace, a branch, a sprint number, or the chat-context steering docs. Use it even when the user just says "weiter wo wir waren" at the top of a fresh chat. Loads memory, filesystem tools, workspace state, decision indices, and steering docs.
 ---
 
-# Session Start
+# Session Start (Boot Sequence)
 
-Boots a working session for a **platform-dev** workspace in a fixed,
-deterministic order. Each step gates the next. The authoritative description of
-the lifecycle is `docs/WORKING_CONCEPT.md` §3.1 — this skill is its executable
-form.
+Boot a platform-dev session deterministically: establish memory, filesystem
+access, ground-truth state, and steering-doc context before substantive work.
 
-This skill is **parametric**. It reads the instance's values from `PROJECT.md`
-at the repo root (and they are mirrored in the project's runtime instructions):
+Parametric over `PROJECT.md`: `memory_scope`, `fs_connector`, `workspace_root`,
+`status_tool`, `adr_path`, `increment_branch`.
 
-- `memory_scope` — the memory scope slug to load
-- `fs_connector` — the filesystem MCP connector name (typically
-  `filesystem-work`)
-- `status_tool` — the script-runner status tool to call for git ground-truth
-  (default `gitstatus`), provided by `script_runner_server`
-- `workspace_root` — the absolute path of the workspace
-- `adr_path` — default `spec/docs/adr/`
+## The boot sequence lives in the STARTER
 
-Never hard-code these. If `PROJECT.md` is not yet read this session, read it
-first.
+**`chat-context/STARTER.md` `## Boot (fix)` is the authoritative, ordered boot
+sequence** — memory load, deferred FS tools, workspace confirm, the status tool,
+then reading the STARTER's own `## Aktiv-Queue` + `## Arbeitsauftrag`. **The boot
+loads exactly three things: the memory digest, the STARTER, and status-tool
+ground-truth.** Everything else — the WORKLIST backlog, ARCHIVE, REGISTRY, the
+INDEX files, WORKING_CONCEPT — is pulled when needed, never boot-mandatory
+(WORKING_CONCEPT §3.1). Execute it top to bottom. This skill does not restate those
+steps; it carries only the boot behaviour the template can't, below.
 
-## Boot sequence
+If STARTER.md is missing or its `## Boot (fix)` section is absent, that is a
+broken state (first session, or a closure bug) — see *Edge cases* at the bottom;
+do not improvise a boot from memory.
 
-Run in order. End with a one-line **boot summary**.
+## Boot behaviour the template doesn't carry
 
-### 1. Load memory (Kumbuka)
-Call `memory_load_context` with `scope: <memory_scope>`. This returns the
-steering-type digest (decision / constraint / convention / glossary / status).
-Then **obey every `type=constraint` entry as a hard rule** for the session.
+### Memory digest is the session's steering context
+`memory_load_context(scope: "<memory_scope>")` returns decision · constraint ·
+convention · glossary · status (excludes open_question unless asked). **Hold the
+digest for the whole session.** Every `type=constraint` is active — if one is
+violated mid-session, interrupt and restate it. Non-negotiable.
 
-If the call fails or times out, say so explicitly and continue from the
-repository — never silently skip the memory layer (it is also the product under
-test; unexpected behaviour is a finding, not a nuisance). See
-`docs/WORKING_CONCEPT.md` §10 for the full memory discipline and the
-source-of-truth order (spec wins → mnemonics → chat context).
+### Status tool vs. STARTER expectation — the cheap-checkmark rule
+After the status tool (step 4), check it against the STARTER's **Erwartung &
+Anomalien**, NOT against any frozen state:
+- **Match → proceed silently.** Do not spend tokens reconstructing or narrating
+  the state. This is the common case and must stay cheap.
+- **Deviation from the stated expectation → that delta is the only signal.**
+  Investigate it and nothing else.
 
-Two standing constraints to surface immediately (WORKING_CONCEPT §13):
-notation is alphanumeric only (A1/A2, Variant 1/2/3, Option A/B/C), never Greek
-letters; and content goes to git, not to memory — mnemonics are pointers.
+The STARTER carries no SHAs/ahead-behind by design — the live status tool is the
+sole live git truth — but no longer the *only* truth checked. The previous
+closure wrote a `status.repo-fingerprint` mnemonic (per-submodule SHA/branch/
+clean) into the memory digest; the cheap-checkmark above verifies the live
+status against *that* — a machine-checkable claim, not prose. Match →
+near-zero cost; a submodule mismatch → go verbose there only.
 
-### 2. Load the deferred filesystem write tools
-The `<fs_connector>` server (the mark3labs `mcp-filesystem-server`,
-https://github.com/mark3labs/mcp-filesystem-server) loads its `list_*` tools by
-default, but the **write/edit tools are deferred** and need an explicit
-`tool_search` before first use:
+**Branch on tool presence first.** If `<status_tool>` cannot be loaded at all (a
+reduced runtime, e.g. mobile/web), there is no ground truth to verify — the
+fingerprint is the sole, *unverified* anchor. Proceed concept-only; no git or
+host mutation. An absent tool is not drift, and a mobile session never writes the
+fingerprint.
 
-```
-tool_search(query="<fs_connector> write file modify create directory move copy")
-```
+### Sprint number is assigned, never guessed
+The session's sprint number comes from the STARTER `title` / the operator, not
+from whatever number happens to be visible in context. A spun-off **track**
+session takes the identity its dispatch/plan prompt assigns it
+(`sprint-N-<track-slug>`), never its own integer `N`. Monotonic IDs (sprint
+numbers + finding F-IDs) are owned by the canonical steering line
+(WORKING_CONCEPT §2.2).
 
-Do this at boot so closure does not stall later. See `docs/TOOLING.md` for the
-connector's quirks (no parent-directory auto-creation; non-recursive
-`create_directory`; read-back discipline).
+### Every ID comes from the REGISTRY
+`chat-context/REGISTRY.md` is the sole allocation authority for ALL numbered ID
+families (FEAT/CHORE/BUG/ADR/D-*/F/Sprint). It is **pulled fresh at the moment of
+allocation** — not boot-mandatory reading. Registry allocation is not
+concurrency-safe, so a boot snapshot would go stale as satellite sessions draw
+numbers in parallel; read it fresh when you allocate, never from a boot snapshot.
+Never mint an ID from prose, memory, filename scans, or table scans; never reuse
+a burned/gap number. Every new ID is registered there in the same breath it is
+first used — the REGISTRY reconciliation at session-closure is a backstop, not a
+substitute for this.
 
-### 3. Confirm the workspace root
-Call `<fs_connector>:list_allowed_directories` and confirm `<workspace_root>` is
-reachable. Absolute paths are required for every file operation — relative
-paths fail.
+### Synthesize the brief
+From the STARTER, hold: the next tasks in execution order (the STARTER's
+`## Aktiv-Queue`, top rows — there is no separate Pointer; the queue lives in the
+STARTER, not the WORKLIST, and the table itself is the queue), the first
+decision/task and any blockers (STARTER `## Arbeitsauftrag`), open/deferred items
+with triggers. Then follow the STARTER's Arbeitsauftrag — that is the authority
+for what happens next.
 
-### 4. Status — ground truth
-Call the `<status_tool>` tool (default `gitstatus`) provided by the
-`script_runner_server`. It returns the authoritative git state: branch, upstream
-ahead/behind, short working-tree status, latest commit, and submodule pointer
-alignment (`+` prefix = mismatch). The script-runner runs it from the superrepo
-root, so it covers the superrepo and every submodule in one call.
+After you have read and understood the current task from the STARTER.md for this
+sprint, print out its name and a brief yet understandable explanation of the
+task. Afterwards start reading the task-related documents.
 
-This is the **only** trusted source for workspace state (WORKING_CONCEPT §12).
-Read it; do not infer state from the STARTER prose or from memory. Flag any
-anomaly (unexpected untracked submodule, `+` pointer, dirty tree) before doing
-substantive work — do not write over an unclear state.
+## Resuming within a session
+The sequence is idempotent. On resume after a break, re-run only the memory load
+and the status tool to confirm nothing changed, then continue.
 
-### 5. Mandatory reads
-Read the steering docs via one batched `read_multiple_files` call (absolute
-paths):
-- `chat-context/WORKLIST.md` — the `## Pointer` section (next front), `## Aktiv`,
-  the wall/active block (schema in WORKING_CONCEPT §11)
-- `chat-context/STARTER.md` — the boot pointer the previous session left
-
-If the STARTER names additional mandatory reads (a sprint file, a finding), read
-those too in the same batched call.
-
-### 6. Boot summary
-Emit one short paragraph: memory loaded + constraints in force · root confirmed ·
-status fresh & state (clean / named anomaly) · reads absorbed (one clause each).
-Then proceed to the **first decision** — which the STARTER usually pre-stages —
-under the `solve-problem` discipline (one decision per turn,
-recommendation-first).
-
-## What NOT to do at boot
-- Don't produce an overwhelming first turn (full harvest + several decisions at
-  once). One thing per turn from the start (WORKING_CONCEPT §4).
-- Don't write anything before the status tool confirms a clean/understood state.
-- Don't trust the STARTER's prose about branch or commit — verify via the status
-  tool.
+## Edge cases
+- **A boot step fails (memory / FS tools / workspace / status tool):** report the
+  specific failure, do **not** proceed, wait for operator guidance.
+- **Git dirty UNEXPECTEDLY:** flag only drift the STARTER's Erwartung does NOT
+  cover; report just that delta and ask — proceed (risky) or stash/commit first?
+  Drift that matches a stated anomaly is expected → proceed silently.
+- **Steering docs missing:** report which ones and ask if expected (first
+  session, or repo restructured). For a genuine first-session bootstrap
+  (no `chat-context/`, no INDEX/WORKLIST/STARTER), the operator directs Concept
+  to create the skeleton structure — a one-time step, not part of normal boot.
