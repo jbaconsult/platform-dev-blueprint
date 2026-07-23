@@ -88,5 +88,7 @@ A ratified decision with a stable ID is persisted document-first — see the
 `adr-author` skill (and WORKING_CONCEPT §9). Write the ADR before the mnemonic.
 
 ## Communication
-Detailed prose, not terse bullet dumps. German for chat; English for all file
-content (WORKING_CONCEPT §13).
+Detailed prose, not terse bullet dumps. Chat is German, and so is `chat-context/` —
+the steering layer follows the chat language. Everything **outside** `chat-context/` is
+English: `docs/`, the `spec/` submodule (ADRs, doctrines), code, and commit messages
+(WORKING_CONCEPT §13).
