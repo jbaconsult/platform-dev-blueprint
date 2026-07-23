@@ -28,7 +28,7 @@ depend on the numbers.
 - §8 Findings vs. decisions
 - §9 ADR-first persistence
 - §10 Memory discipline
-- §11 The WORKLIST schema
+- §11 The task-file model (Backlog · Aktiv-Queue · Archive)
 - §12 Git discipline
 - §13 Language & notation
 - §14 Handover to Code (§17 dispatch)
@@ -84,8 +84,12 @@ platform-dev/                 central repository, published as blueprint
 ├── scripts/                  QS wrapper + modular sub-scripts
 ├── docs/                     stable reference (this file, TOOLING_LL, guides)
 ├── chat-context/             living per-session state
-│   ├── WORKLIST.md           ## Pointer / ## Aktiv / ## Archiv (see §11)
-│   ├── STARTER.md            boot pointer (~1–2 KB)
+│   ├── WORKLIST.md           ## Backlog — pull-only task pool (see §11)
+│   ├── STARTER.md            boot doc + ## Aktiv-Queue (active execution queue)
+│   ├── ARCHIVE.md            finished tasks + sprint chronicle (pull-only)
+│   ├── REGISTRY.md           sole ID-allocation authority (all numbered families)
+│   ├── TECH-DEBT.md          carry-overs, consulted on touch (pull-only)
+│   ├── templates/            TEMPLATE-starter/task/sprint/finding/handover
 │   ├── sprints/              sprint-NN-<slug>.md  (durable sprint records)
 │   ├── findings/             <slug>.md, sec-*.md
 │   └── handover/             Code-return reports, staged for curation (§14)
@@ -144,6 +148,57 @@ implementation apparatus keeps the focus and the measurement. Mixing them lets
 implementation detail erode architectural clarity and lets architecture churn
 destabilize measurement.
 
+### §2.1 Steering-file ownership — Desktop is the single writer
+
+The living state in `chat-context/` (`WORKLIST.md`, `STARTER.md`, `sprints/`,
+`findings/`) is written **exclusively by the Desktop apparatus.** Code never edits
+a steering file — not even a correct, surgical edit, not even its own sprint
+record. Code returns results as a **handover** (§14.3); Desktop folds them into
+the steering files.
+
+*Reason:* multiple Code instances may run in parallel. The steering layer is only
+coherent if it has a single writer — concurrent Code edits to `WORKLIST.md` would
+race, and the central overview (the whole point of the Desktop apparatus) would
+fragment. The artifact-type rule in §2 already places steering-file edits on the
+Desktop side; this makes the consequence explicit and unconditional: **a
+steering-file edit by Code is a boundary violation regardless of how small or
+correct the edit is.** If Code observes that a steering file is stale, it says so
+in its handover return — it does not fix it.
+
+### §2.2 Parallel sessions & cross-session input
+
+Work on a platform may run across **several parallel sessions** at once — one
+canonical steering session plus one or more **satellite sessions**, each
+discussing a particular topic in depth. Satellites are legitimate and useful:
+they think, they design, and they may deliver **draft artifacts** into the
+workspace through the normal channel — a written ADR document, a Code dispatch,
+a finding. The filesystem is the delivery mechanism; an artifact appearing on
+disk is the input *arriving*, not the input being *accepted*.
+
+The rule is the **single-writer principle of §2.1 raised one level** — from the
+steering *files* to the steering *record itself*:
+
+- **Cross-session input is a draft by default.** A satellite session produces a
+  **proposal or a finding (§8)**, never a ratification — *regardless of how
+  thoroughly the topic was discussed in that session*. An ADR delivered by a
+  satellite arrives at status `proposed`; a handover that tells the implementer
+  "do not re-litigate" is **advisory**, not an acceptance.
+- **Ratification and the canonical record are single-writer.** Promoting a draft
+  to ratified — flipping an ADR to `Accepted`, writing the `INDEX` row (§9), the
+  pointer mnemonic (§10), the WORKLIST integration (§11) — happens **only in the
+  canonical steering session**. This is the same coherence guarantee as §2.1: if
+  N sessions could each declare "ratified", there would be N truths and no
+  record.
+- **The canonical session re-derives ground truth.** It does not take a
+  satellite's "ratified" or "done" at face value — the §14.3 control-check
+  applied to cross-session input: read the artifact, confirm it against the spec
+  and the standing constraints, *then* ratify and persist.
+
+A satellite session never writes memory, never edits a steering file, and never
+moves an artifact into the canonical record. It drafts; the canonical session
+signs. (Operationally this also respects the one-active-connector-session rule
+of the filesystem write discipline — concurrent steering writers contend.)
+
 ---
 
 ## §3 Session lifecycle
@@ -155,9 +210,28 @@ encodes its deterministic steps.
 
 In fixed order: load memory (and obey its constraints) → load the deferred
 filesystem write tools → confirm the workspace root → run QS for ground-truth
-state → read the mandatory steering files → emit a one-line boot summary. Only
-then does substantive work begin. State is never inferred from prose — only the
-QS tool is ground truth.
+state → read the STARTER → emit a one-line boot summary. Only then does
+substantive work begin. State is never inferred from prose — only the QS tool is
+ground truth.
+
+**The boot loads exactly three things: the memory digest, the STARTER, and QS
+ground-truth.** Everything else is pulled when needed, never boot-mandatory: the
+WORKLIST backlog and ARCHIVE at closure, the REGISTRY on ID allocation, the INDEX
+files on decision work, this document on method doubt. Keeping the boot to three
+loads is deliberate — the STARTER carries the forward briefing and the active
+queue (§11.2); loading the backlog and reference corpus on every boot is the
+context-flooding failure this three-load model exists to prevent.
+
+As an optimization, the previous closure persists a machine-checkable **repo
+fingerprint** in the memory digest (per-submodule SHAs/branches/clean-flags; for
+the superrepo only branch+clean, never its own HEAD). The boot does not
+re-derive full verbose state — it cheap-verifies the live QS against this
+fingerprint. This is not "trusting prose": the fingerprint is a checkable claim
+and the boot checks it. **Branch on tool presence first:** QS tool absent (a
+reduced runtime, e.g. a mobile/web session) → the fingerprint is the sole,
+unverified anchor; proceed concept-only, no git/host mutation. QS tool present →
+verify: match → proceed at near-zero cost; mismatch → that delta is the signal,
+go verbose there and nowhere else.
 
 ### §3.2 Work (`solve-problem`)
 
@@ -167,10 +241,24 @@ empirical (§4–§7).
 
 ### §3.3 Closure (`session-closure`)
 
-In fixed order: write findings → write the sprint record → update WORKLIST
-(including archiving, §11) → rewrite STARTER → run QS → emit the operator-gated
-git block → emit the next session's starter prompt as the final act. Nothing
-follows the starter prompt.
+In fixed order: write findings → write the sprint record → consolidate the task
+files (§11: pull the next task(s) from the WORKLIST backlog into the STARTER's
+`## Aktiv-Queue`, removed from the backlog; move each finished task to ARCHIVE.md)
+→ rewrite STARTER → run QS → emit the operator-gated git block → emit the next
+session's starter prompt as the final act, immediately preceded — after the
+operator's push — by writing the repo fingerprint to memory from a post-push QS
+read-back. Nothing follows the starter prompt.
+
+**File moves and renames are deferred to the git block (§12.1), not executed
+through the filesystem connector during the session.** When closure consumes a
+handover (moving it to `handover/_consumed/`), retires or renames a doc, or a
+spec-corpus cleanup renames ledgers, the move is *proposed* as a `git mv` line in
+the operator-gated git block — it is not done mid-session as a connector
+copy-then-delete. *Reason:* `git mv` preserves history (Git records a rename, not
+a delete-plus-new file), and it avoids the error-prone whole-file copy the
+connector forces (a re-typed copy can silently drop or truncate content). The
+session may still *write* new files and *edit* existing ones through the
+connector; only **moving and renaming** is reserved for the git block.
 
 Sub-decisions that crossed the apparatus boundary are dispatched to Code
 (`code-handover`, §14) during the work phase, not at closure. Where a Code
@@ -375,7 +463,10 @@ git-tracked ADR is the durable artifact; memory is the index into it.
 Infrastructure and provisioning choices are subordinate to ratified
 architecture: they choose adapters/backends within the frame an ADR sets and may
 not circumvent it. If infrastructure reality breaks an ADR's assumption, the path
-is ADR revision via supersession — never silent circumvention.
+is ADR revision via supersession — never silent circumvention. On a technical
+aspect the ADR is the last authoritative instance before implementation; a
+decision-ledger entry touching the same technical aspect is reconciled to the
+ADR, never the reverse.
 
 ---
 
@@ -408,38 +499,45 @@ The memory layer is durable, work-steering pointers — distilled, not the recor
 
 ---
 
-## §11 The WORKLIST schema
+## §11 The task-file model (Backlog · Aktiv-Queue · Archive)
 
-`chat-context/WORKLIST.md` is the living state of the work. It has three fixed
-sections in fixed order:
+The living task state is split across three files with three roles and a directed
+flow — **Backlog → Aktiv-Queue → Archive**. A task is in **exactly one** of the
+three at any time (disjointness).
 
-### §11.1 `## Pointer`
-Always first, always current. The single next front — what the next session
-opens with. The STARTER's header is drawn from here. This is the one place the
-"where do we stand" lives; there is no separate state file.
+### §11.1 `chat-context/WORKLIST.md` — the Backlog (pull-only)
+The prioritized task pool and intake point for everything new. Schema v2: a single
+`## Backlog` table (`# · Cluster · Titel · Komp · Typ · Prio · Größe · Disp ·
+Status · Ref`). **Not part of the boot digest** — read only at closure and pulled
+on demand. New tasks land here; the active *execution order* does not live in the
+backlog row order (it lives in the Aktiv-Queue, §11.2).
 
-### §11.2 `## Aktiv`
-The running sprint series and the wall / active work block: open sprints and the
-sprint just closed. Kept lean — only what is genuinely in play.
+### §11.2 `chat-context/STARTER.md` — the Aktiv-Queue
+The next sprints/tasks in execution order live in the STARTER's `## Aktiv-Queue`
+section (a formalized table, top = next), pulled from the backlog at closure. The
+STARTER is the **one boot-loaded task file**; its queue is the execution cursor. A
+task promoted into the queue has been **removed from the backlog** — the two never
+hold the same task.
 
-### §11.3 `## Archiv`
-Completed sprint series, retained as history but no longer actively referenced.
-Each archived series is reduced to a one-line pointer to its `sprints/` record.
+### §11.3 `chat-context/ARCHIVE.md` — the Archive (pull-only)
+Finished tasks (`## Archiv-Tasks`: one line + link — a retrieval index that
+discriminates, not a summary) and the sprint chronicle (`## Archiv-Sprints`).
+**Not part of the boot digest** — appended at closure, searched on demand.
 
-### §11.4 Archiving rule (A1)
-A sprint block moves from `## Aktiv` to `## Archiv` **at session closure**, once
-its wall and result are fully persisted in a `sprints/sprint-NN-<slug>.md`
-record. The WORKLIST then keeps only the one-line pointer; the detailed content
-lives in the sprint file. The trigger is closure, not a size threshold —
-archiving is regel-clear and machine-unambiguous, and "see the last few sprints"
-is served by `## Archiv` directly below. This keeps `## Aktiv` lean, bounds the
-WORKLIST's growth, and keeps sectional edits small (which the filesystem write
-discipline depends on — see `TOOLING_LL.md`).
+### §11.4 The flow (closure-driven)
+New → backlog. At closure: pull the next task(s) from the backlog into the
+STARTER's Aktiv-Queue (removed from the backlog); move each finished task to
+ARCHIVE.md (`## Archiv-Tasks`, one line + link). The trigger is **closure**, not a
+size threshold. Because the backlog and archive are pull-only, neither bloats the
+boot; because a task lives in exactly one file, there is no dual-source drift.
 
 ### §11.5 Editing
-WORKLIST is edited with **sectional** edits, never a wholesale rewrite (large
-full-file writes risk a crash). Sprint numbers are informal conversational
-estimates, never canonical reservations.
+The backlog and the Aktiv-Queue tables are edited via the `worklist-manager` skill
+(read → modify in memory → whole-file write → read-back), never hand-edited. Sprint
+numbers are informal conversational estimates, never canonical reservations (the
+REGISTRY is the sole ID-allocation authority). **All task files are written only by
+Desktop (§2.1)** — Code reports task-relevant state via its handover return, never
+by editing a file.
 
 ---
 
@@ -452,6 +550,14 @@ block, the operator executes it. Claude does not push, merge, or commit.
   git block. The block is built from verified state, never from prose or memory.
   The first line of the block is always a branch check (`git branch
   --show-current`).
+- **`--no-pager` for status-producing git (hard rule).** Every git command in the
+  block that emits output to be read back — `status`, `log`, `diff`, `show`,
+  `branch`, `tag --list`, `stash list` — is written as `git --no-pager <subcommand> …`.
+  A pager (`less`) intercepts the output in the operator's terminal: it can hide
+  truncation, require interaction to dismiss, or swallow the result entirely, which
+  defeats the predict-then-measure read-back the block exists for. Mutating commands
+  (`add`/`commit`/`push`/`merge`/`mv`/`checkout`/`pull`/`fetch`) take no `--no-pager`.
+  The QS/`gitstatus` tool is unaffected — it already returns plain text.
 - **Increment branch, not main.** Day-to-day work commits to the increment
   branch and pushes it. `main` is reserved for milestone completion.
 - **Single-stage closure** (no submodule touched): stage `chat-context/` + any
@@ -464,12 +570,42 @@ block, the operator executes it. Claude does not push, merge, or commit.
   super-pointer moves.
 - **Multi-stage schema sessions:** one commit at session end, not one per stage.
 
+### §12.1 File moves and renames belong in the git block
+
+Moving or renaming a tracked file is done with **`git mv`** inside the
+operator-gated git block, **never** as a filesystem-connector copy-then-delete
+during the session. This covers: consuming a handover
+(`git mv handover/<f>.md handover/_consumed/<f>.md`), retiring or renaming a doc,
+archiving a sprint file, and bulk renames such as a spec-corpus ledger cleanup.
+
+*Reasons:*
+- **History is preserved.** `git mv` records a rename; Git's history and `blame`
+  follow the file. A connector copy-then-delete looks like a deleted file plus an
+  unrelated new file — the lineage is lost.
+- **No content risk.** The connector offers only whole-file writes, so a "move"
+  through it is a re-typed copy that can silently truncate or drop content (a
+  real failure mode observed in practice). `git mv` moves the bytes untouched.
+- **One audited step.** The move lands in the same operator-reviewed block as the
+  rest of the closure, with the same ground-truth-before discipline.
+
+Mechanics: propose the `git mv` lines as part of the closure block (after the
+branch check, before `git add`/commit). For a submodule-internal move, the
+`git mv` runs inside the submodule and follows the two-stage ordering above. The
+session itself never moves or renames through the connector — it only *writes*
+new files and *edits* existing ones; moving and renaming is deferred here.
+
 ---
 
 ## §13 Language & notation
 
-- **Language.** German for chat; **English for all file content** — documents,
-  ADRs, commit messages, schema, code, and this file.
+- **Language.** German for chat. File content splits by content class (§1.2):
+  - **`chat-context/` → German** (the chat-steering layer follows the chat
+    language): `WORKLIST.md`, `STARTER.md`, new `sprints/`, `findings/`,
+    `handover/`. This is living state read only from inside the running work —
+    same language as the conversation that drives it. (An instance whose chat
+    language is not German applies its own chat language here instead.)
+  - **`docs/`, `spec/` (ADRs, doctrines), commit messages, schema, code → English**
+    (publishable blueprint, upstream-/machine-relevant, this file included).
 - **Notation.** Variant labels are **alphanumeric only**: `A1`/`A2`, `B1`/`B2`,
   `Variant 1/2/3`, `Option A/B/C`. Never Greek letters (α/β/γ), roman numerals,
   or emojis. *Reasons:* greppability across commits and queries, keyboard input
@@ -524,7 +660,8 @@ Back on Desktop:
 3. Fold the result into the next decision (`solve-problem`).
 4. **At closure, curate** the report into the durable record (the sprint file, a
    finding, or a decision note) and **prune the consumed report** from
-   `handover/`. The folder is a staging area, not the record (§3.3).
+   `handover/` (moved to `handover/_consumed/` via a `git mv` in the git block,
+   §12.1). The folder is a staging area, not the record (§3.3).
 
 The Code apparatus cannot write mnemonics or ledgers; anything newly decided in a
 sub-sprint returns in the handover report and is ratified by Concept (§8).
@@ -539,7 +676,8 @@ sub-sprint returns in the handover report and is ratified by Concept (§8).
   instances are created.
 - **apparatus** — one of the two work environments: Desktop (concept) or Code
   (implementation), §2.
-- **front** — the current focus of work, recorded in WORKLIST `## Pointer`.
+- **front** — the current focus of work, carried in the STARTER's `## Aktiv-Queue`
+  and `## Arbeitsauftrag` (there is no separate WORKLIST pointer).
 - **wall** — an empirical obstacle observed in a running system; real at n ≥ 2,
   §6.
 - **ADR** — Architecture Decision Record; a ratified decision with a stable ID,
