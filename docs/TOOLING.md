@@ -12,13 +12,16 @@ of the apparatus; documenting it is real work, not overhead.
 
 ---
 
-## Filesystem connector — mark3labs `mcp-filesystem-server`
+## Workspace connector — official Anthropic `mcp-filesystem` server
 
-The workspace's filesystem MCP connector is the mark3labs
-`mcp-filesystem-server` (https://github.com/mark3labs/mcp-filesystem-server).
-Referred to by the `fs_connector` parameter in `PROJECT.md` (typically
-`filesystem-work`). Allowed root is set in the server config; absolute paths are
-required for every operation.
+The workspace's filesystem MCP connector is the **official Anthropic
+`mcp-filesystem` server**
+(https://github.com/modelcontextprotocol/servers/tree/HEAD/src/filesystem),
+which replaced the earlier mark3labs `mcp-filesystem-server`. Referred to by the
+`fs_connector` parameter in `PROJECT.md` — typically named `workspace`; pick a
+connector name that cannot be confused with the ephemeral code-execution
+container's own filesystem. Allowed root is set in the server config; absolute
+paths are required for every operation.
 
 ### Deferred tools
 The `list_*` and read tools load by default. The **write, edit, and directory
@@ -26,7 +29,7 @@ tools are deferred** — they must be loaded with a `tool_search` before first
 use:
 
 ```
-tool_search(query="<fs_connector> write file modify create directory move copy")
+tool_search(query="<fs_connector> write edit_file create_directory write_file")
 ```
 
 The `session-start` skill does this at boot so closure does not stall.
@@ -35,30 +38,44 @@ The `session-start` skill does this at boot so closure does not stall.
 1. **`write_file` does not auto-create parent directories.** Writing
    `a/b/c.md` when `a/b/` does not exist fails with *"parent directory does not
    exist"*. Create the directory chain first.
-2. **`create_directory` is not recursive.** Each level is created individually —
-   `chat-context/`, then `chat-context/sprints/`. A deep path in one call fails
-   on the missing intermediate.
+2. **`create_directory` is documented as recursive** on the official server (it
+   can create multiple nested directories in one call) — unlike the mark3labs
+   predecessor, which was per-level. Verify at first deep use before relying on
+   it; if a deep path fails, fall back to creating each level top-down.
 
-Reliable pattern for a new nested file: create each directory level top-down,
-then `write_file`.
+Reliable pattern for a new nested file: ensure the directory chain exists
+(`create_directory`), then `write_file`.
 
-### No sectional-edit tool
-The `filesystem-work` connector exposes `write_file` (whole-file write), not a
-sectional find/replace edit. Every change to an existing file is a full
-overwrite: read the current content, modify it in full, write it back — there is
-no anchored in-place edit. Keep large files (e.g. WORKLIST) structured so a
-whole-file rewrite stays manageable, and always read the file fresh before
-overwriting so no concurrent change is lost. (This differs from earlier
-connectors that had a `modify_file`; do not assume one exists. Note: the host
-may also offer a generic `str_replace`/`view` pair, but those act on a separate
-container filesystem, not on the connector's work area — they will not edit
-these files.)
+### Anchored `edit_file` is the default for existing files
+The connector exposes an exact-match in-place edit, `edit_file`
+(`path`, `edits` array of `oldText`/`newText`, optional `dryRun`). For any change
+to an existing file this is the **default** — it replaces only the matched region
+rather than rewriting the whole file, so it is lower-risk on large structured
+files (WORKLIST, big docs). `oldText` must match character-for-character
+(whitespace, indentation, line breaks); always `dryRun: true` first for complex
+multi-line edits to confirm the match. `write_file` (whole-file overwrite) stays
+the right tool for **new** files and **small** files where a clean full rewrite
+is simpler; treat a whole-file overwrite of a large file as the higher-risk path
+(read fresh, rewrite in full, read back). (The mark3labs predecessor had a
+regex-anchored `modify_file`; the official server uses exact-match `edit_file`
+instead.)
 
 ### Read-back discipline
 A success message is **not** proof the write landed where intended. After any
-`write_file` to a new path, confirm with a targeted `list_directory`; when in
-doubt, re-read the file. This is the single most important habit — it catches
-silent path mistakes before they compound.
+`write_file` to a new path, confirm with a targeted `list_directory` or
+`get_file_info`; when in doubt, re-read the file. This is the single most
+important habit — it catches silent path mistakes before they compound.
+
+**The container trap (recurring — see `constraint.workspace-writes-via-connector-only`).**
+Write workspace files ONLY through the filesystem connector
+(`write_file`/`edit_file`/`create_directory`). NEVER reach for the computer-use
+tools `create_file`/`bash`/`str_replace`: they write to the ephemeral
+code-execution container, silently create a look-alike path (e.g.
+`<workspace_root>/...` INSIDE the container), and return "success" while the
+real machine's tree never receives the file. Symptom: Code or the operator
+cannot find a file you "wrote"; `get_file_info` returns ENOENT despite the
+success message. The read-back above is what catches it — trust the stat, not
+the success line.
 
 ### Other notes
 - Run one session against the connector at a time; parallel sessions sharing one
@@ -106,6 +123,11 @@ Kumbuka (https://kumbuka.ai) provides the durable work-memory. Discipline:
   write); `memory_forget` removes a keyed entry (entries are insert-only, so a
   revision is forget + fresh write).
 - Keys are lowercase with dot/hyphen separators, no underscores.
+- **Content limit:** ≤ 1,500 characters per entry. A violation returns a **typed,
+  self-explanatory error** with the exact count (e.g. `content too long: max 1500
+  characters (was 1610)`) — verified empirically against a live workspace. An older
+  note claiming a raw JSON-RPC `-32603` for this case is obsolete; if you still see
+  a bare `-32603` on a length violation, that is a regression finding.
 - Unexpected behaviour (errors, odd latency, wrong scope visibility) is captured
   as a finding — the memory layer is also a product under test.
 
